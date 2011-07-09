@@ -21,7 +21,7 @@
             var camera, scene, renderer, info, mouse2d, sun, sphere;
 
             var initial_y_speed = 0.1;
-            var range = 400, speed = 10, sphereSize = 4, y_speed = initial_y_speed;
+            var speed = 5.5, sphereSize = 4, y_speed = initial_y_speed;
             var a = 10, t = 0, direction = 1;
 
             var reversed = false;
@@ -85,35 +85,38 @@
               // table collision
   		        var table_ray = new THREE.Ray( sphere.position, new THREE.Vector3(0,-1,0) );
 			        var c = THREE.Collisions.rayCastNearest(table_ray);
-			        if(c && (c.distance < 4) && (c.distance != -1)) {
+			        if(c && (c.distance < 4) && (c.distance != -1)) { //&& (c.distance != -1)
 			          direction = -direction;			          
 			        }
-			        
-			        //if(direction > 0) {
-                y_speed = initial_y_speed + a * t;
-              //} else {
-              //  y_speed -= gravity_constant * t * 1.2;
-              //}
-              sphere.position.y -= y_speed;
+
+              y_speed = initial_y_speed + a * t;
+              
+			        if(direction > 0) {
+                sphere.position.y -= y_speed;
+              } else {
+                sphere.position.y += y_speed;
+              }
+              
               t += 0.001;
               
               // rackets collisions
   		        var rackets_ray = new THREE.Ray( sphere.position, new THREE.Vector3(0,0,1) );
 
 			        var c = THREE.Collisions.rayCastNearest(rackets_ray);
-	
+	info.innerHTML = 'direction: ' + direction;//"Colliding!";
+	            // collided with left bat
 	  		      if(c && (c.distance < 20) && (c.distance != -1)) {
-  				      info.innerHTML = 'a: ' + c.distance;//"Colliding!";
+  				      //info.innerHTML = 'a: ' + c.distance;//"Colliding!";
 				        speed = -speed;
 				        reversed = true;
 				        t = 0.001;
-				        sphere.position.y = 50;
-				        y_speed = initial_y_speed;
-			        } else if(c && c.distance >= 800) {
+				        //y_speed = initial_y_speed;
+				        direction = -direction;
+			        } else if(c && c.distance >= 800) { // collided with right bat
 			          if(reversed) {
    				        t = 0.001;
  				          speed = -speed;
-   				        y_speed = initial_y_speed;
+   				        //y_speed = initial_y_speed;
  				          reversed = false;
  				        }
 				        //info.innerHTML = "Approaching @ " + c.distance;
