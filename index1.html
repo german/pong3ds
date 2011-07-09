@@ -18,12 +18,15 @@
 
         <script type="text/javascript">
 
-            var camera, scene, renderer, info, mouse2d, sun, sphere;
+            var camera, scene, renderer, info, mouse2d, sun, ball, my_bat, mouseX, mouseY;
 
             var initial_y_speed = 0.1;
             var speed = 5.5, sphereSize = 4, y_speed = initial_y_speed;
             var a = 10, t = 0, direction = 1;
-
+            
+			      var windowHalfX = window.innerWidth / 2;
+			      var windowHalfY = window.innerHeight / 2;
+			      
             var reversed = false;
             
             function init(){
@@ -41,9 +44,9 @@
 
                 scene = new THREE.Scene();
 
-                sphere = new THREE.Mesh( new THREE.SphereGeometry( sphereSize, 10, 10 ), new THREE.MeshBasicMaterial( { color: 0xffff00 } ) );
-                sphere.position = new THREE.Vector3( 0, 0, -390 );
-                scene.addObject( sphere );
+                ball = new THREE.Mesh( new THREE.SphereGeometry( sphereSize, 10, 10 ), new THREE.MeshBasicMaterial( { color: 0xffff00 } ) );
+                ball.position = new THREE.Vector3( 0, 0, -390 );
+                scene.addObject( ball );
 
                 renderer = new THREE.CanvasRenderer();
                 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -58,7 +61,7 @@
             function createObstacles(){
 				      createCube(100, 100, 10, new THREE.Vector3(0, 0, -400), 0x003300);
               createCube(400, 10, 800, new THREE.Vector3(0, -50, 0), 0x2c2dee); // table
-				      createCube(100, 100, 10, new THREE.Vector3(0, 0, 400), 0x003300);
+				      my_bat = createCube(100, 100, 10, new THREE.Vector3(0, 0, 400), 0x003300);
             }
 
             function createCube(sx, sy, sz, p, color){
@@ -71,64 +74,56 @@
 
             function onDocumentMouseMove(event){
               event.preventDefault();
-              mouse2d.x = (event.clientX / window.innerWidth) * 2 - 1;
-              mouse2d.y = -(event.clientY / window.innerHeight) * 2 + 1;
-              mouse2d.z = 1;
+       				mouseX = ( event.clientX - windowHalfX );
+      				mouseY = ( event.clientY - windowHalfY );
             }
 
             function animate(){
               requestAnimationFrame(animate);
 
-              sphere.position.z += speed;
-              
+              ball.position.z += speed;
               
               // table collision
-  		        var table_ray = new THREE.Ray( sphere.position, new THREE.Vector3(0,-1,0) );
+  		        var table_ray = new THREE.Ray( ball.position, new THREE.Vector3(0,-1,0) );
 			        var c = THREE.Collisions.rayCastNearest(table_ray);
-			        if(c && (c.distance < 4) && (c.distance != -1)) { //&& (c.distance != -1)
+			        if(c && (c.distance < 4) && (c.distance != -1)) {
 			          direction = -direction;			          
 			        }
 
               y_speed = initial_y_speed + a * t;
               
 			        if(direction > 0) {
-                sphere.position.y -= y_speed;
+                ball.position.y -= y_speed;
               } else {
-                sphere.position.y += y_speed;
+                ball.position.y += y_speed;
               }
               
               t += 0.001;
               
-              // rackets collisions
-  		        var rackets_ray = new THREE.Ray( sphere.position, new THREE.Vector3(0,0,1) );
+              // collisions with bats
+  		        var bats_ray = new THREE.Ray( ball.position, new THREE.Vector3(0,0,1) );
 
-			        var c = THREE.Collisions.rayCastNearest(rackets_ray);
-	info.innerHTML = 'direction: ' + direction;//"Colliding!";
+			        var c = THREE.Collisions.rayCastNearest(bats_ray);
+  
 	            // collided with left bat
-	  		      if(c && (c.distance < 20) && (c.distance != -1)) {
+	  		      if(c && (c.distance < 10) && (c.distance != -1)) {
   				      //info.innerHTML = 'a: ' + c.distance;//"Colliding!";
 				        speed = -speed;
 				        reversed = true;
 				        t = 0.001;
-				        //y_speed = initial_y_speed;
 				        direction = -direction;
 			        } else if(c && c.distance >= 800) { // collided with right bat
 			          if(reversed) {
    				        t = 0.001;
  				          speed = -speed;
-   				        //y_speed = initial_y_speed;
  				          reversed = false;
  				        }
-				        //info.innerHTML = "Approaching @ " + c.distance;
-			        } else if(c) {
-			          //info.innerHTML = "Approaching @ " + c.distance;
-			        } else {
-				        //info.innerHTML = "No collider in sight.";
 			        }
 
 			        //camera.position.x = Math.cos(mouse2d.x * Math.PI) * 300;
 		          //camera.position.z = 200 + Math.sin(mouse2d.x * Math.PI) * 300;
-
+              my_bat.position.x = mouseX;
+              
               renderer.render(scene, camera);
             }
         </script>
