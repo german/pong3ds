@@ -20,8 +20,9 @@
 
             var camera, scene, renderer, info, mouse2d, sun, sphere;
 
-            var range = 400, speed = 3, sphereSize = 4, y_speed = 0.1;
-            var gravity_constant = 10, t = 0, direction = 1;
+            var initial_y_speed = 0.1;
+            var range = 400, speed = 10, sphereSize = 4, y_speed = initial_y_speed;
+            var a = 10, t = 0, direction = 1;
 
             var reversed = false;
             
@@ -40,20 +41,13 @@
 
                 scene = new THREE.Scene();
 
-                sphere = new THREE.Mesh( new THREE.SphereGeometry( sphereSize, 5, 5 ), new THREE.MeshBasicMaterial( { color: 0xffff00 } ) );
-                sphere.position = new THREE.Vector3( 0, 0, 150 );
+                sphere = new THREE.Mesh( new THREE.SphereGeometry( sphereSize, 10, 10 ), new THREE.MeshBasicMaterial( { color: 0xffff00 } ) );
+                sphere.position = new THREE.Vector3( 0, 0, -390 );
                 scene.addObject( sphere );
 
                 renderer = new THREE.CanvasRenderer();
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 container.appendChild(renderer.domElement);
-
-                //var ambientLight = new THREE.AmbientLight(0xdddddd);
-                //scene.addLight(ambientLight);
-
-                //sun = new THREE.DirectionalLight(0xffffff);
-                //sun.position = new THREE.Vector3(1, -1, 1).normalize();
-                //scene.addLight(sun);
 
                 createObstacles();
 
@@ -62,11 +56,8 @@
             }
 
             function createObstacles(){
-              /*createCube(100, 100, 10, new THREE.Vector3(0, 0, -400), 0x003300);
-              createCube(10, 400, 800, new THREE.Vector3(-50, 0, 0), 0x00ffff); // table // camera.target = 
-				      createCube(100, 100, 10, new THREE.Vector3(0, 0, 400), 0x003300); */
 				      createCube(100, 100, 10, new THREE.Vector3(0, 0, -400), 0x003300);
-              createCube(400, 10, 800, new THREE.Vector3(0, -50, 0), 0x00ffff); // table
+              createCube(400, 10, 800, new THREE.Vector3(0, -50, 0), 0x2c2dee); // table
 				      createCube(100, 100, 10, new THREE.Vector3(0, 0, 400), 0x003300);
             }
 
@@ -89,21 +80,21 @@
               requestAnimationFrame(animate);
 
               sphere.position.z += speed;
-              sphere.position.y -= y_speed;
+              
               
               // table collision
   		        var table_ray = new THREE.Ray( sphere.position, new THREE.Vector3(0,-1,0) );
 			        var c = THREE.Collisions.rayCastNearest(table_ray);
 			        if(c && (c.distance < 4) && (c.distance != -1)) {
-			          direction = -direction;
+			          direction = -direction;			          
 			        }
 			        
-			        if(direction > 0) {
-                y_speed += gravity_constant * t;
-              } else {
-                y_speed -= gravity_constant * t;
-              }
-              
+			        //if(direction > 0) {
+                y_speed = initial_y_speed + a * t;
+              //} else {
+              //  y_speed -= gravity_constant * t * 1.2;
+              //}
+              sphere.position.y -= y_speed;
               t += 0.001;
               
               // rackets collisions
@@ -111,20 +102,25 @@
 
 			        var c = THREE.Collisions.rayCastNearest(rackets_ray);
 	
-	  		      if(c && (c.distance < 4) && (c.distance != -1)) {
+	  		      if(c && (c.distance < 20) && (c.distance != -1)) {
   				      info.innerHTML = 'a: ' + c.distance;//"Colliding!";
 				        speed = -speed;
 				        reversed = true;
+				        t = 0.001;
+				        sphere.position.y = 50;
+				        y_speed = initial_y_speed;
 			        } else if(c && c.distance >= 800) {
 			          if(reversed) {
+   				        t = 0.001;
  				          speed = -speed;
+   				        y_speed = initial_y_speed;
  				          reversed = false;
  				        }
 				        //info.innerHTML = "Approaching @ " + c.distance;
 			        } else if(c) {
-			          info.innerHTML = "Approaching @ " + c.distance;
+			          //info.innerHTML = "Approaching @ " + c.distance;
 			        } else {
-				        info.innerHTML = "No collider in sight.";
+				        //info.innerHTML = "No collider in sight.";
 			        }
 
 			        //camera.position.x = Math.cos(mouse2d.x * Math.PI) * 300;
