@@ -6,70 +6,60 @@ var http = require('http')
   , url = require('url')
   , fs = require('fs')
   , sys = require('sys')
-  //, server
-  , room_module = require('./room_module')
   , number_of_rooms = 10
-  , rooms = [];
+  , rooms = {};
 
 var io = require('socket.io').listen(8080);
 
 for(var i = 0; i < number_of_rooms; i++) {
-  rooms[i] = new room_module.Room();
+  rooms[i] = 0; //new room_module.Room();
 }
 
 function get_list_of_rooms() {
   var list_of_rooms = {type: 'list_of_rooms', number_of_rooms: number_of_rooms, rooms: []}
   for(var i = 0; i < number_of_rooms; i++) {
-    list_of_rooms['rooms'].push({number_of_connected_players: rooms[i].get_number_of_connected_players() })
+    list_of_rooms['rooms'].push({number_of_connected_players: rooms[i] })
   }
   return list_of_rooms;
 }
 
-// number_of_rooms - global integer
-// rooms - global array
-function find_room_and_disconnect_by_session_id(session_id) {
-  var room_id_with_disconnected_player = null;
-  for(var i = 0; i < number_of_rooms; i++) {
-    var room = rooms[i];
-    if(!room.is_empty()) {
-      if(room.disconnect(session_id)) {
-        room_id_with_disconnected_player = i;
-        break;
-      }
-    }
-  }
-  return room_id_with_disconnected_player;
-}
-//var file = new(static.Server)('./public');
-
-//server = http.createServer(function(req, res){
-  //// all static files are served with https://github.com/cloudhead/node-static
-  ////req.addListener('end', function () {
-  ////  file.serve(req, res);
-  ////});
-//});
-
-//server.listen(8081);
-
-//var io = io.listen(server);
-
-/*io.set('transports', [
-    'websocket'
-  , 'flashsocket'
-  , 'htmlfile'
-  , 'xhr-polling'
-  , 'jsonp-polling'
-]);
-
-redis_client.on("message", function (channel, message) {
-  console.log("channel " + channel + ": " + message);
-  //io.sockets.emit(channel, { channel: channel, message: message});
-  io.sockets.json.send({ channel: channel, message: message});
-});*/
-
 io.sockets.on('connection', function (socket) {
   socket.emit('list_of_rooms', get_list_of_rooms());  
-  //socket.join('room#');
-  //socket.broadcast.to('room#').emit('new fan');
-  //io.sockets.in('rammstein fans').emit('new non-fan');
+  
+  socket.on('disconnect', function () {
+    console.log('socket leaved - ' + socket.room_id)
+    rooms[socket.room_id] -= 1;
+    socket.leave('room#'+socket.room_id);
+  });
+  
+  socket.on('connect', function(msg) {
+    console.log(msg.room_id);
+    socket.join('room#' + msg.room_id);
+    socket.room_id = msg.room_id;
+    rooms[msg.room_id] += 1;
+    // check whether this connected user was not connected to the other room on the same server
+
+
+    if(rooms[msg.room_id] == 1) {
+      //selected_room.first_player_connect();
+      socket.json.emit('player_connected', {player_id: 1});
+    } else if(rooms[msg.room_id] == 2){
+      //selected_room.second_player_connect();
+
+      // when second player has connected, 1st player could had moved up or down his default position, so show him right cordinates in buffer variable
+      socket.json.emit('player_connected', {player_id: 2 }); // buffer: buffer 
+
+      //client.broadcast({ type: 'round_could_be_started', room_id: message.room_id});
+      io.sockets.in('room#'+msg.room_id).emit('round_could_be_started');
+    }
+    
+    /*for(var i = 0; i < number_of_rooms; i++) {
+      rooms[i].debug_session_ids();
+    }*/
+    
+    var list_of_rooms = get_list_of_rooms();
+    //client.send(list_of_rooms);
+    //client.broadcast(list_of_rooms);
+    socket.broadcast.json.emit(list_of_rooms);
+  })
 });

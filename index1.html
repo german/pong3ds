@@ -45,16 +45,23 @@
             var reversed = false;
             
             var socket = io.connect('http://localhost:8080');
-            
-            /*    socket.on('room#'+room_id, function (data) {
-                  console.log(data);
-                  socket.emit('my other event', { my: 'data' });
-                });*/
-                
-            socket.on('list_of_rooms', function (list) {
-              show_list_of_rooms(list)
+                            
+            socket.on('player_connected', function (msg) {
+              console.log('msg - ' + msg.player_id);
             });
-                
+
+            socket.on('round_could_be_started', function(msg){
+              console.log('round could be started');
+              jQuery.facebox.close();
+              jQuery('.list_of_rooms').hide();
+              init();
+            });
+            
+            socket.on('list_of_rooms', function (list) {
+              console.log('got list of rooms');
+              show_list_of_rooms(list);
+            });
+                            
             function show_list_of_rooms(list) {
               $('.form_for_list_of_rooms').html('');
               var img_for_room, is_room_disabled_for_select = '';
