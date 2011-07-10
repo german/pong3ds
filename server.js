@@ -32,6 +32,10 @@ io.sockets.on('connection', function (socket) {
     socket.leave('room#'+socket.room_id);
   });
   
+  socket.on('round_started', function(msg) {
+    io.sockets.in('room#'+msg.room_id).emit('round_started');
+  });
+  
   socket.on('sync', function(msg) {
     console.log('msg.room_id - ' + msg.room_id);
     io.sockets.in('room#'+msg.room_id).volatile.emit('sync', msg);

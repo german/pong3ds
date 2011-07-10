@@ -9,23 +9,14 @@
             margin: 0px;
             overflow: hidden;
           }
-          
-          .list_of_rooms {
-            position:absolute;
-            top:120px;
-            left:20px;
-            width:215px;
-            padding:5px;
-            border:1px solid green;
-          }
         </style>
-
+        <link href="stylesheets/facebox.css" media="screen" rel="stylesheet" type="text/css"/>
+        
         <script type="text/javascript" src="Three.js"></script>
         <!--script type="text/javascript" src="RequestAnimationFrame.js"></script-->
         <script type="text/javascript" src="jquery-1.5.1.min.js"></script>
         <script type="text/javascript" src="facebox.js"></script>
         <script type="text/javascript" src="keyboard.js"></script>
-        
         <script src="socket.io/socket.io.min.js"></script>
         
         <script type="text/javascript">
@@ -68,6 +59,12 @@
               round_could_be_started = true;
               set_keyboard_bindings_for(player_bats[current_player_id]);
               //start_round();
+            });
+            
+            socket.on('round_started', function() {
+              if(current_player_id == 2) {
+                start_round();
+              }
             });
             
             socket.on('list_of_rooms', function (list) {
@@ -118,21 +115,23 @@
               //ball_movement_timer = setInterval(function() { ball.move.apply(ball) }, TICK_INTERVAL);  // in order to this.draw work in ball's move() function we use apply here
               //ball.initial_shot();
 
-              bg_timer = setInterval(function() {
-                var info = {room_id: room_id, player_id: current_player_id, position_x: player_bats[current_player_id].position.x} // room_id: window.room_id
-                if(current_player_id == player_id_having_the_ball) {
-                  var ball_position = ball.position;
-                  info['ball_x'] = ball_position.x;
-                  info['ball_y'] = ball_position.y;
-                  info['ball_z'] = ball_position.z;
-                  //info['previous_x'] = coords.previous_x;
-                  //info['previous_y'] = coords.previous_y;
-                }
-                socket.json.emit('sync', info);
-              }, TICK_INTERVAL);
+              if(current_player_id == 1) {
+                bg_timer = setInterval(function() {
+                  var info = {room_id: room_id, player_id: current_player_id, position_x: player_bats[current_player_id].position.x} // room_id: window.room_id
+                  if(current_player_id == player_id_having_the_ball) {
+                    var ball_position = ball.position;
+                    info['ball_x'] = ball_position.x;
+                    info['ball_y'] = ball_position.y;
+                    info['ball_z'] = ball_position.z;
+                    //info['previous_x'] = coords.previous_x;
+                    //info['previous_y'] = coords.previous_y;
+                  }
+                  socket.json.emit('sync', info);
+                }, TICK_INTERVAL);
+              }
             }
-
-            var finish_round = function(player_won) {
+            
+            function finish_round(player_won) {
               jQuery.facebox('Player ' + player_won + ' won!');
               setTimeout(function() { jQuery.facebox.close() }, 3000); // automatically close the alert after 3 seconds
 
@@ -162,10 +161,10 @@
 
               info = document.getElementById("info");
 
-              camera = new THREE.Camera(60, window.innerWidth / window.innerHeight, 1, 10000);
-		          camera.position.y = 150;
-            	camera.position.x = 500;
-		          camera.position.z = 0;
+              camera = new THREE.Camera(50, window.innerWidth / window.innerHeight, 1, 1000);
+		          camera.position.y = 200;//150;
+            	camera.position.x = 600; //500;
+		          camera.position.z = -190;
 
               mouse2d = new THREE.Vector3( 0, 0, 1 );
 
@@ -187,17 +186,12 @@
             }
 
             function createObstacles(){
-              current_player_shape = createBat(100, 100, 10, new THREE.Vector3(0, 0, 400), 0x003300); // left user #1
-				      other_player_shape = createBat(100, 100, 10, new THREE.Vector3(0, 0, -400), 0x003300); // right user #2
+              current_player_shape = createBat(100, 100, 10, new THREE.Vector3(0, 0, 400), 0xF56991); // left user #1
+				      other_player_shape = createBat(100, 100, 10, new THREE.Vector3(0, 0, -400), 0xFF9F80); // right user #2
               createTable(400, 5, 800, new THREE.Vector3(0, -50, 0)); // table
 
-				      //if(current_player_id == 1){
-                player_bats.push(other_player_shape);
-                player_bats.push(current_player_shape);
-              //} else {
-              //  player_bats.push(current_player_shape);
-              //  player_bats.push(other_player_shape);
-              //}
+              player_bats.push(other_player_shape);
+              player_bats.push(current_player_shape);
             }
 
             function createBat(sx, sy, sz, p, color){            
@@ -209,9 +203,7 @@
             }
 
             function createTable(sx, sy, sz, p) {
-            	//var textureCanvas = new THREE.Texture( imageCanvas, THREE.UVMapping, THREE.RepeatWrapping, THREE.RepeatWrapping );
-            	//textureCanvas.needsUpdate = true;
-            	var cube = new THREE.Mesh(new THREE.CubeGeometry( sx, sy, sz ), new THREE.MeshBasicMaterial( { color: 0x2c2dee } ) ); // , map: THREE.ImageUtils.loadTexture("images/rsz_1table_c1.gif")
+            	var cube = new THREE.Mesh(new THREE.CubeGeometry( sx, sy, sz ), new THREE.MeshBasicMaterial( { color: 0x79BD9A, map: THREE.ImageUtils.loadTexture("images/table2r.gif") } ) );
               cube.position = p;
               scene.addObject(cube);
               THREE.Collisions.colliders.push( THREE.CollisionUtils.MeshOBB(cube) );
@@ -264,6 +256,10 @@
  				            speed = -speed;
  				            reversed = false;
  				          }
+ 				        } else if(ball.position.z < -415) {
+ 				          finish_round(2);
+ 				        } else if(ball.position.z > 415) {
+ 				          finish_round(1);
 			          }
               }
               
@@ -271,6 +267,9 @@
 		          //camera.position.z = 200 + Math.sin(mouse2d.x * Math.PI) * 300;
 		          if(mouseX < 200 && mouseX > -200) {
                 player_bats[current_player_id].position.x = mouseX;
+                if(!round_started && current_player_id == player_id_having_the_ball) {
+                  ball.position.x = mouseX;
+                }
               }
               
               renderer.render(scene, camera);
@@ -278,19 +277,17 @@
         </script>
     </head>
     <body> <!-- onload="init();" -->
-      <div id="score"></div>
+      <div id="score">0 : 0</div>
       <div id="options"></div>
       
-      <div class="list_of_rooms">
+      <div id="list_of_rooms" style="display:none">
         <h3>Please select to which room you want to connect:</h3>
-        
         <form class="form_for_list_of_rooms" onsubmit="if(typeof window.room_id != 'undefined') {$('.errors_for_list_of_rooms').hide(); socket.emit('connect', {room_id: window.room_id}); jQuery.facebox.close();} else { $('.errors_for_list_of_rooms').show() }; return false;"></form>
-        
         <div class="errors_for_list_of_rooms" style="color:red;font-size:16px;float:left;display:none">You should specify which room do you want to play in</div>
       </div>
       
       <script type="text/javascript">
-        jQuery.facebox({ div: '.list_of_rooms' });
+        jQuery.facebox({ div: '#list_of_rooms' });
       </script>
     </body>
 </html>
