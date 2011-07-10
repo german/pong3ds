@@ -21,9 +21,10 @@
         </style>
 
         <script type="text/javascript" src="Three.js"></script>
-        <script type="text/javascript" src="RequestAnimationFrame.js"></script>
+        <!--script type="text/javascript" src="RequestAnimationFrame.js"></script-->
         <script type="text/javascript" src="jquery-1.5.1.min.js"></script>
         <script type="text/javascript" src="facebox.js"></script>
+        <script type="text/javascript" src="keyboard.js"></script>
         
         <script src="socket.io/socket.io.min.js"></script>
         
@@ -31,11 +32,18 @@
             $.facebox.settings.closeImage = 'images/closelabel.png';
             $.facebox.settings.loadingImage = 'images/loading.gif';
             
-            var camera, scene, renderer, info, mouse2d, sun, ball, my_bat, mouseX, mouseY;
+            var camera, scene, renderer, info, mouse2d, sun, ball, mouseX, mouseY;
 
             var initial_y_speed = 0.1;
             var speed = 5.5, sphereSize = 4, y_speed = initial_y_speed;
             var a = 10, t = 0, direction = 1;
+
+            var TICK_INTERVAL  = 200;
+            var player_bats = [null], current_player_shape, other_player_shape, current_player_id;
+            var player_id_having_the_ball = 1; // this could vary once the ball went off the canvas / round ended
+            var round_started = false, round_could_be_started = false;
+            var ball_movement_timer, bg_timer;
+            var player_1_won_rounds = 0, player_2_won_rounds = 0;
             
 			      var windowHalfX = window.innerWidth / 2;
 			      var windowHalfY = window.innerHeight / 2;
@@ -47,21 +55,40 @@
             var socket = io.connect('http://localhost:8080');
                             
             socket.on('player_connected', function (msg) {
+              current_player_id = msg.player_id;
               console.log('msg - ' + msg.player_id);
+              
+              jQuery.facebox.close();
+              jQuery('.list_of_rooms').hide();
+              init();
             });
 
             socket.on('round_could_be_started', function(msg){
               console.log('round could be started');
-              jQuery.facebox.close();
-              jQuery('.list_of_rooms').hide();
-              init();
+              round_could_be_started = true;
+              set_keyboard_bindings_for(player_bats[current_player_id]);
+              //start_round();
             });
             
             socket.on('list_of_rooms', function (list) {
               console.log('got list of rooms');
               show_list_of_rooms(list);
             });
-                            
+            
+            socket.on('sync', function(sync_msg) {
+              //console.log('sync_msg.room_id == room_id - ' + (sync_msg.room_id == room_id));
+              if(sync_msg.room_id == room_id) {
+                //if(player_bats[sync_msg.player_id].can_move({to_pos: obj.position_y})) {
+                  player_bats[sync_msg.player_id].position.x = sync_msg.position_x;
+                //}
+                // ball's position is synced to player having the ball in this round
+                //console.log('sync_msg.ball_x - ' + sync_msg.ball_x + '; sync_msg.ball_y - ' + sync_msg.ball_y + '; sync_msg.ball_z - ' + sync_msg.ball_z );
+
+                // second player just corrects position of his ball from player_1's one
+                ball.position = new THREE.Vector3(sync_msg.ball_x, sync_msg.ball_y, sync_msg.ball_z);
+              }
+            });
+                          
             function show_list_of_rooms(list) {
               $('.form_for_list_of_rooms').html('');
               var img_for_room, is_room_disabled_for_select = '';
@@ -85,6 +112,50 @@
               $('.form_for_list_of_rooms').append('<input type="submit" value="Connect"/ >');
             }
             
+            function start_round() {
+              round_started = true;
+              clearInterval(ball_movement_timer);
+              //ball_movement_timer = setInterval(function() { ball.move.apply(ball) }, TICK_INTERVAL);  // in order to this.draw work in ball's move() function we use apply here
+              //ball.initial_shot();
+
+              bg_timer = setInterval(function() {
+                var info = {room_id: room_id, player_id: current_player_id, position_x: player_bats[current_player_id].position.x} // room_id: window.room_id
+                if(current_player_id == player_id_having_the_ball) {
+                  var ball_position = ball.position;
+                  info['ball_x'] = ball_position.x;
+                  info['ball_y'] = ball_position.y;
+                  info['ball_z'] = ball_position.z;
+                  //info['previous_x'] = coords.previous_x;
+                  //info['previous_y'] = coords.previous_y;
+                }
+                socket.json.emit('sync', info);
+              }, TICK_INTERVAL);
+            }
+
+            var finish_round = function(player_won) {
+              jQuery.facebox('Player ' + player_won + ' won!');
+              setTimeout(function() { jQuery.facebox.close() }, 3000); // automatically close the alert after 3 seconds
+
+              clearInterval(ball_movement_timer);
+              clearInterval(bg_timer);
+              ball_movement_timer = null;
+              bg_timer = null;
+              
+              round_started = false;
+              round_could_be_started = true;
+
+              if(player_won == 1) {
+                player_1_won_rounds += 1;
+              } else {
+                player_2_won_rounds += 1;
+              }
+
+              document.getElementById('score').innerHTML = player_1_won_rounds + ' : ' + player_2_won_rounds;
+              //ball = new Ball(ctx, window.player_id_having_the_ball, player_shapes[window.player_id_having_the_ball]);
+              //player_bats[window.player_id_having_the_ball].set_ball(ball);
+              //redraw_all();
+            }
+
             function init(){
               container = document.createElement('div');
               document.body.appendChild(container);
@@ -112,16 +183,24 @@
 
               container.onmousemove = onDocumentMouseMove;
                                 
-              animate();
+              setInterval(animate, 5);
             }
 
             function createObstacles(){
-				      createCube(100, 100, 10, new THREE.Vector3(0, 0, -400), 0x003300);
-              createCube(400, 10, 800, new THREE.Vector3(0, -50, 0), 0x2c2dee); // table
-				      my_bat = createCube(100, 100, 10, new THREE.Vector3(0, 0, 400), 0x003300);
+              current_player_shape = createBat(100, 100, 10, new THREE.Vector3(0, 0, 400), 0x003300); // left user #1
+				      other_player_shape = createBat(100, 100, 10, new THREE.Vector3(0, 0, -400), 0x003300); // right user #2
+              createTable(400, 5, 800, new THREE.Vector3(0, -50, 0)); // table
+
+				      //if(current_player_id == 1){
+                player_bats.push(other_player_shape);
+                player_bats.push(current_player_shape);
+              //} else {
+              //  player_bats.push(current_player_shape);
+              //  player_bats.push(other_player_shape);
+              //}
             }
 
-            function createCube(sx, sy, sz, p, color){
+            function createBat(sx, sy, sz, p, color){            
               var cube = new THREE.Mesh(new THREE.CubeGeometry( sx, sy, sz ), new THREE.MeshBasicMaterial( { color: color } ) );
               cube.position = p;
               scene.addObject(cube);
@@ -129,64 +208,77 @@
 				      return cube;
             }
 
+            function createTable(sx, sy, sz, p) {
+            	//var textureCanvas = new THREE.Texture( imageCanvas, THREE.UVMapping, THREE.RepeatWrapping, THREE.RepeatWrapping );
+            	//textureCanvas.needsUpdate = true;
+            	var cube = new THREE.Mesh(new THREE.CubeGeometry( sx, sy, sz ), new THREE.MeshBasicMaterial( { color: 0x2c2dee } ) ); // , map: THREE.ImageUtils.loadTexture("images/rsz_1table_c1.gif")
+              cube.position = p;
+              scene.addObject(cube);
+              THREE.Collisions.colliders.push( THREE.CollisionUtils.MeshOBB(cube) );
+				      return cube;
+            }
+            
             function onDocumentMouseMove(event){
               event.preventDefault();
        				mouseX = ( event.clientX - windowHalfX );
       				mouseY = ( event.clientY - windowHalfY );
             }
 
-            function animate(){
-              requestAnimationFrame(animate);
+            function animate(){            
+              //requestAnimationFrame(animate);
 
-              ball.position.z += speed;
+              if(round_started) {
+                ball.position.z += speed;
               
-              // table collision
-  		        var table_ray = new THREE.Ray( ball.position, new THREE.Vector3(0,-1,0) );
-			        var c = THREE.Collisions.rayCastNearest(table_ray);
-			        if(c && (c.distance < 4) && (c.distance != -1)) {
-			          direction = -direction;			          
-			        }
+                // check table collision
+    		        var table_ray = new THREE.Ray( ball.position, new THREE.Vector3(0,-1,0) );
+	  		        var c = THREE.Collisions.rayCastNearest(table_ray);
+		  	        if(c && (c.distance < 4) && (c.distance != -1)) {
+			            direction = -direction;			          
+			          }
 
-              y_speed = initial_y_speed + a * t;
+                y_speed = initial_y_speed + a * t;
               
-			        if(direction > 0) {
-                ball.position.y -= y_speed;
-              } else {
-                ball.position.y += y_speed;
+			          if(direction > 0) {
+                  ball.position.y -= y_speed;
+                } else {
+                  ball.position.y += y_speed;
+                }
+              
+                t += 0.001;
+              
+                // check collisions with bats
+  		          var bats_ray = new THREE.Ray( ball.position, new THREE.Vector3(0,0,1) );
+			          var c = THREE.Collisions.rayCastNearest(bats_ray);
+  
+	              // collided with left bat
+	  		        if(c && (c.distance < 10) && (c.distance != -1)) {
+    				      //info.innerHTML = 'a: ' + c.distance;//"Colliding!";
+	  			        speed = -speed;
+		  		        reversed = true;
+			  	        t = 0.001;
+				          direction = -direction;
+			          } else if(c && c.distance >= 800) { // collided with right bat
+			            if(reversed) {
+   				          t = 0.001;
+ 				            speed = -speed;
+ 				            reversed = false;
+ 				          }
+			          }
               }
               
-              t += 0.001;
-              
-              // collisions with bats
-  		        var bats_ray = new THREE.Ray( ball.position, new THREE.Vector3(0,0,1) );
-
-			        var c = THREE.Collisions.rayCastNearest(bats_ray);
-  
-	            // collided with left bat
-	  		      if(c && (c.distance < 10) && (c.distance != -1)) {
-  				      //info.innerHTML = 'a: ' + c.distance;//"Colliding!";
-				        speed = -speed;
-				        reversed = true;
-				        t = 0.001;
-				        direction = -direction;
-			        } else if(c && c.distance >= 800) { // collided with right bat
-			          if(reversed) {
-   				        t = 0.001;
- 				          speed = -speed;
- 				          reversed = false;
- 				        }
-			        }
-
 			        //camera.position.x = Math.cos(mouse2d.x * Math.PI) * 300;
 		          //camera.position.z = 200 + Math.sin(mouse2d.x * Math.PI) * 300;
-              my_bat.position.x = mouseX;
+		          if(mouseX < 200 && mouseX > -200) {
+                player_bats[current_player_id].position.x = mouseX;
+              }
               
               renderer.render(scene, camera);
             }
         </script>
     </head>
     <body> <!-- onload="init();" -->
-      <div id="info"></div>
+      <div id="score"></div>
       <div id="options"></div>
       
       <div class="list_of_rooms">
