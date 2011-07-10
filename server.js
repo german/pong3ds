@@ -38,8 +38,8 @@ io.sockets.on('connection', function (socket) {
   
   socket.on('sync', function(msg) {
     console.log('msg.room_id - ' + msg.room_id);
-    io.sockets.in('room#'+msg.room_id).volatile.emit('sync', msg);
-    //io.sockets.in('room#'+msg.room_id).emit('sync', msg);
+    //io.sockets.in('room#'+msg.room_id).volatile.emit('sync', msg);
+    io.sockets.in('room#'+msg.room_id).emit('sync', msg);
   });
   
   socket.on('connect', function(msg) {

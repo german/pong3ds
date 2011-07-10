@@ -13,7 +13,6 @@
         <link href="stylesheets/facebox.css" media="screen" rel="stylesheet" type="text/css"/>
         
         <script type="text/javascript" src="Three.js"></script>
-        <!--script type="text/javascript" src="RequestAnimationFrame.js"></script-->
         <script type="text/javascript" src="jquery-1.5.1.min.js"></script>
         <script type="text/javascript" src="facebox.js"></script>
         <script type="text/javascript" src="keyboard.js"></script>
@@ -29,12 +28,14 @@
             var speed = 5.5, sphereSize = 4, y_speed = initial_y_speed;
             var a = 10, t = 0, direction = 1;
 
-            var TICK_INTERVAL  = 200;
+            var TICK_INTERVAL  = 100;
             var player_bats = [null], current_player_shape, other_player_shape, current_player_id;
             var player_id_having_the_ball = 1; // this could vary once the ball went off the canvas / round ended
             var round_started = false, round_could_be_started = false;
             var ball_movement_timer, bg_timer;
             var player_1_won_rounds = 0, player_2_won_rounds = 0;
+            
+            var previous_x, previous_y, previous_z; // in order to properly sync ball's
             
 			      var windowHalfX = window.innerWidth / 2;
 			      var windowHalfY = window.innerHeight / 2;
@@ -80,9 +81,12 @@
                 //}
                 // ball's position is synced to player having the ball in this round
                 //console.log('sync_msg.ball_x - ' + sync_msg.ball_x + '; sync_msg.ball_y - ' + sync_msg.ball_y + '; sync_msg.ball_z - ' + sync_msg.ball_z );
-
+                ball_position = ball.position;
+                
                 // second player just corrects position of his ball from player_1's one
-                ball.position = new THREE.Vector3(sync_msg.ball_x, sync_msg.ball_y, sync_msg.ball_z);
+                if(sync.previous_x != ball_position.x && sync.previous_y != ball_position.y && sync.previous_z != ball_position.z) {
+                  ball.position = new THREE.Vector3(sync_msg.ball_x, sync_msg.ball_y, sync_msg.ball_z);
+                }
               }
             });
                           
@@ -123,8 +127,10 @@
                     info['ball_x'] = ball_position.x;
                     info['ball_y'] = ball_position.y;
                     info['ball_z'] = ball_position.z;
-                    //info['previous_x'] = coords.previous_x;
-                    //info['previous_y'] = coords.previous_y;
+
+                    info['previous_x'] = previous_x;
+                    info['previous_y'] = previous_y;
+                    info['previous_z'] = previous_z;
                   }
                   socket.json.emit('sync', info);
                 }, TICK_INTERVAL);
@@ -216,12 +222,14 @@
       				mouseY = ( event.clientY - windowHalfY );
             }
 
-            function animate(){            
-              //requestAnimationFrame(animate);
-
+            function animate() {
               if(round_started) {
-                ball.position.z += speed;
-              
+                var ball_position = ball.position;
+                
+                previous_x = ball_position.x;
+                previous_y = ball_position.y;
+                previous_z = ball_position.z;
+                
                 // check table collision
     		        var table_ray = new THREE.Ray( ball.position, new THREE.Vector3(0,-1,0) );
 	  		        var c = THREE.Collisions.rayCastNearest(table_ray);
@@ -236,7 +244,7 @@
                 } else {
                   ball.position.y += y_speed;
                 }
-              
+                ball.position.z += speed;
                 t += 0.001;
               
                 // check collisions with bats
